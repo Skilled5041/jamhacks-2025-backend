@@ -27,7 +27,6 @@ ws.on('open', () => {
         process.exit(0);
     });
 });
-
 ws.on('message', (data) => {
     console.log(`Received: ${data}`);
 });
