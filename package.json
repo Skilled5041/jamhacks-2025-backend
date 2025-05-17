@@ -2,11 +2,12 @@
   "name": "jamhacks-2025-backend",
   "version": "1.0.50",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node tests/test.js http://localhost:3000/help",
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "elysia": "latest",
+    "openai": "^4.100.0"
   },
   "devDependencies": {
     "bun-types": "latest"
