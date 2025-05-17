@@ -1,13 +1,23 @@
 import { Elysia } from "elysia";
-import { cors } from "@elysiajs/cors";
-import axios from "axios";
 
-// idk if loading env variables works differently with bun
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const PORT = process.env.PORT || 3000;
 
 const app = new Elysia()
-  .use(cors())
+  .onRequest(({ request, set }) => {
+    if (request.method === 'OPTIONS') {
+      set.headers['Access-Control-Allow-Origin'] = '*';
+      set.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+      set.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+      set.status = 204;
+      return '';
+    }
+    
+    set.headers['Access-Control-Allow-Origin'] = '*';
+    set.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+    set.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+  })
+  .get("/", () => "Hello MrGoose")
   .post("/api/gemini/ask", async ({ body }) => {
     const { conversation } = body as { conversation: Array<{role: string, content: string}> };
     
@@ -20,7 +30,7 @@ const app = new Elysia()
 
     // including the backticks so it's easier for us to parse & inject fill in the blank code into the editor 
     const systemPrompt = `
-You are MrGoose, a helpful and friendly coding assistant that supports beginner developers as a VS Code extension.
+You are MrGoose, a helpful and friendly coding assistant that supports beginner developers inside VS Code.
 Your main goals:
 - Help the user when they are trying to build or add a feature to their code.
 - Engage in a helpful and non-overwhelming conversation to understand what they are trying to build.
@@ -40,24 +50,35 @@ Your job is to teach by guiding, not solving everything.
     ];
 
     try {
-      const response = await axios.post(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
         {
-          contents: [
-            {
-              role: 'user',
-              parts: fullPrompt.map((msg) => ({ text: `${msg.role}: ${msg.content}` })),
-            },
-          ],
-        },
-        {
-          params: {
-            key: GEMINI_API_KEY,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: fullPrompt.map((msg) => ({ text: `${msg.role}: ${msg.content}` })),
+              },
+            ],
+          }),
         }
       );
 
-      const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, MrGoose had a brain freeze!';
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Gemini API error:', errorData);
+        return new Response(JSON.stringify({ error: 'Failed to get response from Gemini.' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, MrGoose had a brain freeze!';
       return { reply: text };
     } catch (error) {
       console.error('Gemini API error:', error);
@@ -70,5 +91,5 @@ Your job is to teach by guiding, not solving everything.
   .listen(PORT);
 
 console.log(
-  `MrGoose backend is running at http://${app.server?.hostname}:${app.server?.port}`
+  `🦊 MrGoose backend is running at http://${app.server?.hostname}:${app.server?.port}`
 );
