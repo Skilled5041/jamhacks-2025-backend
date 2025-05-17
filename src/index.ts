@@ -12,16 +12,22 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
     let codeHelper = false;
 
     ws.send("Startstreaming");
-    // Get OpenAI response
-    await streamGeminiResponse(messages, (data) => {
-        if(data.includes("ASKCODEHELPER")){
+
+    const { text: geminiResponse, snippets } = await streamGeminiResponse(messages, (data) => {
+        if (data.includes("ASKCODEHELPER")) {
             codeHelper = true;
         }
-        response += data;
-        if(!codeHelper){
-            ws.send(data);
+        if (!codeHelper) {
+            ws.send(data); // Stream text normally
         }
     });
+
+    if (snippets.length > 0) {
+        ws.send(JSON.stringify({
+            type: "snippets",
+            snippets
+        }));
+    }
 
     if(codeHelper){
         console.log("Asking big bro");
@@ -35,13 +41,24 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
         await streamGeminiResponse(messages, (data)=>{
             response += data;
             ws.send(data);
-        })
+        });
+
+        const { text: finalResponse, snippets: oaiSnippets } = await streamGeminiResponse(messages, (data) => {
+            ws.send(data);
+        });
+
+        if (oaiSnippets.length > 0) {
+            ws.send(JSON.stringify({
+                type: "snippets",
+                snippets: oaiSnippets
+            }));
+        }
+    } else {
+        messages.push({ role: "assistant", content: geminiResponse });
     }
 
-    messages.push({ role: "assistant", content: response });
-    
     connectionMessages.set(ws.id, messages);
-    
+
     // end stream
     ws.send("Endstreaming");
 }
