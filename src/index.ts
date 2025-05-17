@@ -17,6 +17,7 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
         if(data.includes("🎐")){
             codeHelper = true;
         }
+        data = data.replaceAll("\n", "🆕");
         response += data;
         if(!codeHelper){
             ws.send(data);
