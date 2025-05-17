@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { getOpenAIResponse, streamGeminiResponse } from "./openai";
+import { streamOpenAIResponse, streamGeminiResponse } from "./openai";
 import {teacherPrompt, coderPrompt} from "./proompts";
 
 
@@ -27,17 +27,17 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
 
     if(codeHelper){
         console.log("Asking expert coder");
-        const codeRes = await getOpenAIResponse([
+        ws.send("codeinsertion");
+        response = '';
+        await streamOpenAIResponse([
             {role: "system", content: coderPrompt},
             {role: "user", content: `Message: ${response}\n\nCode: <<<${code}>>>`}
-        ])
-        console.log(codeRes);
-        messages.push({role: "assistant", content: `The expert coder has responded with the following: ${codeRes}`});
-        response = '';
-        await streamGeminiResponse(messages, (data)=>{
+        ],(data) => {
             response += data;
             ws.send(data);
-        })
+        });
+        
+        messages.push({role: "assistant", content: `${response}`});
     }
 
     messages.push({ role: "assistant", content: response });
