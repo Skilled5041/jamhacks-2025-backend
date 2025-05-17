@@ -49,33 +49,33 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
 
 const app = new Elysia()
     .get("/", () => "Hello World")
-    .ws('/help',  {        
-body: t.Object({
-            code: t.String(),
-            message: t.String()
-        }),
-        open(ws) {
-            // Initialize messages array for new connections with the system message
-            connectionMessages.set(ws.id, [
-                { role: 'system', content: teacherPrompt },
-                { role: 'assistant', content: '🪿 Honk! Are we adding something shiny and new, or chasing down a sneaky bug? And where in this messy nest of code are we poking today?' }
-            ]);
-        },
-        async message(ws, {code, message}) {
-            // Get existing messages for this connection or create new array if none exists
-            let messages = connectionMessages.get(ws.id) || [
-                { role: 'system', content: teacherPrompt }
-            ];
-            
-            // Add user message
-            messages.push({ role: 'user', content: `Code: ${code}.\n\nQuestion: ${message}` });
-            handleMessage(ws, messages, code);
-        },
-        close(ws) {
-            // Clean up messages when connection closes
-            connectionMessages.delete(ws.id);
-        }
-    })
+.ws('/help',  {      
+    body: t.Object({
+        code: t.String(),
+        message: t.String()
+    }),
+    open(ws) {
+        // Initialize messages array for new connections with the system message
+        connectionMessages.set(ws.id, [
+            { role: 'system', content: teacherPrompt },
+            { role: 'assistant', content: '🪿 Honk! Are we adding something shiny and new, or chasing down a sneaky bug? And where in this messy nest of code are we poking today?' }
+        ]);
+    },
+    async message(ws, {code, message}) {
+        // Get existing messages for this connection or create new array if none exists
+        let messages = connectionMessages.get(ws.id) || [
+            { role: 'system', content: teacherPrompt }
+        ];
+        
+        // Add user message
+        messages.push({ role: 'user', content: `Code: ${code}.\n\nQuestion: ${message}` });
+        handleMessage(ws, messages, code);
+    },
+    close(ws) {
+        // Clean up messages when connection closes
+        connectionMessages.delete(ws.id);
+    }
+})
     .ws('/debug', {
         body: t.Object({
             code: t.String(),

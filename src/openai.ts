@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { ChatCompletionMessageParam } from 'openai/resources';
 
 const geminiClient = new OpenAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -8,9 +9,15 @@ const openaiClient = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
-import { ChatCompletionMessageParam } from 'openai/resources';
+function toChatCompletionMessages(messages: Array<{ role: string, content: string }>): ChatCompletionMessageParam[] {
+  return messages.map(msg => ({
+    role: msg.role as 'system' | 'user' | 'assistant',
+    content: msg.content
+  }));
+}
 
 export const getOpenAIResponse = async (messages: Array<{ role: string, content: string }>, ) => { 
+    const chatMessages = toChatCompletionMessages(messages);
     try {
         const chatMessages: ChatCompletionMessageParam[] = messages.map(msg => ({
             role: msg.role as 'system' | 'user' | 'assistant',
@@ -53,6 +60,7 @@ export const streamOpenAIResponse = async (messages: Array<{ role: string, conte
 }
 
 export const streamGeminiResponse = async (messages: Array<{ role: string, content: string }>, callback: (data: string) => void) => {
+    const chatMessages = toChatCompletionMessages(messages);
     try {
         const chatMessages: ChatCompletionMessageParam[] = messages.map(msg => ({
             role: msg.role as 'system' | 'user' | 'assistant',
