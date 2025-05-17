@@ -14,7 +14,7 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
     ws.send("Startstreaming");
     // Get OpenAI response
     await streamGeminiResponse(messages, (data) => {
-        if(data.includes("ASKCODEHELPER")){
+        if(data.includes("🎐")){
             codeHelper = true;
         }
         response += data;
@@ -23,11 +23,12 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
         }
     });
 
+
     if(codeHelper){
-        console.log("Asking big bro");
+        console.log("Asking expert coder");
         const codeRes = await getOpenAIResponse([
             {role: "system", content: coderPrompt},
-            {role: "user", content: response}
+            {role: "user", content: `Message: ${response}\n\nCode: <<<${code}>>>`}
         ])
         console.log(codeRes);
         messages.push({role: "assistant", content: `The expert coder has responded with the following: ${codeRes}`});
@@ -58,7 +59,7 @@ body: t.Object({
             // Initialize messages array for new connections with the system message
             connectionMessages.set(ws.id, [
                 { role: 'system', content: teacherPrompt },
-                { role: 'assistant', content: '🪿 Honk! Are we adding something shiny and new, or chasing down a sneaky bug? And where in this messy nest of code are we poking today?' }
+                { role: 'assistant', content: '🪿 Honk! How can I help you?' }
             ]);
         },
         async message(ws, {code, message}) {
@@ -68,7 +69,7 @@ body: t.Object({
             ];
             
             // Add user message
-            messages.push({ role: 'user', content: `Code: ${code}.\n\nQuestion: ${message}` });
+            messages.push({ role: 'user', content: `Code: <<<${code}>>>.\n\nQuestion: ${message}` });
             handleMessage(ws, messages, code);
         },
         close(ws) {
@@ -95,7 +96,7 @@ body: t.Object({
             ];
             
             // Add user message
-            messages.push({ role: 'user', content: `This is the user's current code: ${code}.\n\nThe user was asking: ${message}` });
+            messages.push({ role: 'user', content: `Code: <<<${code}>>>.\n\nQuestion: ${message}` });
             
             handleMessage(ws, messages, code);
         },
