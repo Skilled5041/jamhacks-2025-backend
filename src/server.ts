@@ -20,7 +20,7 @@ const app = new Elysia()
 
     // including the backticks so it's easier for us to parse & inject fill in the blank code into the editor 
     const systemPrompt = `
-You are MrGoose, a helpful and friendly coding assistant that supports beginner developers inside VS Code.
+You are MrGoose, a helpful and friendly coding assistant that supports beginner developers as a VS Code extension.
 Your main goals:
 - Help the user when they are trying to build or add a feature to their code.
 - Engage in a helpful and non-overwhelming conversation to understand what they are trying to build.
