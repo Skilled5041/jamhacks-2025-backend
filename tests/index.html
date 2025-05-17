@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Editor with WebSocket</title>
+    <!-- Include CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/dracula.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .editor-container {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+        }
+        .CodeMirror {
+            height: 400px;
+            font-size: 16px;
+        }
+        .question-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #e0e0e0;
+            margin-top: 20px;
+        }
+        .response-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .endpoint-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .endpoint-btn {
+            padding: 8px 16px;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .endpoint-btn.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Code Editor with WebSocket</h1>
+        
+        <div class="endpoint-selector">
+            <button id="helpEndpoint" class="endpoint-btn active">Help Mode</button>
+            <button id="debugEndpoint" class="endpoint-btn">Debug Mode</button>
+        </div>
+        
+        <div class="editor-container">
+            <textarea id="code-editor"></textarea>
+        </div>
+        
+        <div class="question-container">
+            <h3>Ask a question about your code:</h3>
+            <textarea id="question" placeholder="Type your question here..."></textarea>
+            <div class="controls">
+                <button id="send-button">Send</button>
+                <button id="clear-button">Clear</button>
+            </div>
+        </div>
+        
+        <div class="status" id="connection-status">WebSocket: Disconnected</div>
+        
+        <div class="response-container" id="response">
+            Response will appear here...
+        </div>
+    </div>
+
+    <!-- Include CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js"></script>
+
+    <script>
+        // Initialize CodeMirror
+        const codeEditor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+            mode: "javascript",
+            theme: "dracula",
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            indentUnit: 4,
+            tabSize: 4,
+            lineWrapping: true
+        });
+
+        // WebSocket connection
+        let ws = null;
+        let currentEndpoint = '/help'; // Default endpoint
+        const serverUrl = 'ws://localhost:3000'; // Update with your server URL
+
+        // DOM elements
+        const statusEl = document.getElementById('connection-status');
+        const responseEl = document.getElementById('response');
+        const questionEl = document.getElementById('question');
+        const sendButton = document.getElementById('send-button');
+        const clearButton = document.getElementById('clear-button');
+        const helpEndpointBtn = document.getElementById('helpEndpoint');
+        const debugEndpointBtn = document.getElementById('debugEndpoint');
+
+        // Connect to WebSocket
+        function connectWebSocket() {
+            if (ws) {
+                ws.close();
+            }
+
+            ws = new WebSocket(serverUrl + currentEndpoint);
+
+            ws.onopen = () => {
+                statusEl.textContent = `WebSocket: Connected to ${serverUrl}${currentEndpoint}`;
+                statusEl.style.backgroundColor = '#d4edda';
+                sendButton.disabled = false;
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data === "Startstreaming") {
+                    responseEl.textContent = "";
+                } else if (event.data === "Endstreaming") {
+                    // Stream ended
+                } else {
+                    responseEl.textContent += event.data;
+                    // Auto scroll to bottom
+                    responseEl.scrollTop = responseEl.scrollHeight;
+                }
+            };
+
+            ws.onclose = () => {
+                statusEl.textContent = 'WebSocket: Disconnected';
+                statusEl.style.backgroundColor = '#f8d7da';
+                sendButton.disabled = true;
+                
+                // Try to reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                statusEl.textContent = 'WebSocket: Error';
+                statusEl.style.backgroundColor = '#f8d7da';
+            };
+        }
+
+        // Send message to WebSocket server
+        function sendMessage() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const code = codeEditor.getValue();
+                const message = questionEl.value.trim();
+                
+                if (!message) {
+                    alert('Please enter a question');
+                    return;
+                }
+                
+                const payload = JSON.stringify({
+                    code: code,
+                    message: message
+                });
+                
+                ws.send(payload);
+            } else {
+                statusEl.textContent = 'WebSocket: Not connected';
+                statusEl.style.backgroundColor = '#f8d7da';
+                
+                // Try to reconnect
+                connectWebSocket();
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        clearButton.addEventListener('click', () => {
+            questionEl.value = '';
+            responseEl.textContent = 'Response will appear here...';
+        });
+
+        helpEndpointBtn.addEventListener('click', () => {
+            currentEndpoint = '/help';
+            updateEndpointUI();
+            connectWebSocket();
+        });
+
+        debugEndpointBtn.addEventListener('click', () => {
+            currentEndpoint = '/debug';
+            updateEndpointUI();
+            connectWebSocket();
+        });
+
+        function updateEndpointUI() {
+            helpEndpointBtn.classList.toggle('active', currentEndpoint === '/help');
+            debugEndpointBtn.classList.toggle('active', currentEndpoint === '/debug');
+        }
+
+        // Initialize connection when the page loads
+        window.addEventListener('load', connectWebSocket);
+    </script>
+</body>
+</html>
