@@ -39,16 +39,18 @@ export const getOpenAIResponse = async (messages: Array<{ role: string, content:
 export const analyzeCodeWithOpenAI = async (code: string) => {
     try {
         const systemPrompt = `
-            You are a code analysis expert. Analyze the provided JavaScript/TypeScript code for errors.
-            Return ONLY a JSON array with error objects in this format:
+            You are a code analysis expert. Analyze the provided JavaScript/TypeScript code for logical errors. 
+            Prioritize commenting on best practices and logic instead of syntax. In addition, if there are questions about how to do something in the comments, briefly respond to them.
+            Return ONLY a JSON ARRAY with objects in this format:
+            // {returning the line & character of error}
             [
-                // {returning the line & character of error}
-                    "line": number,
-                    "character": number,
-                    "message": "detailed error description",
-                    "severity": "error" or "warning"
-                }
-            ]
+            {
+                "line": number,
+                "character": number,
+                "message": "detailed error description"
+            }
+            ]   
+            Follow this format exactly.
             Empty array if no errors. Be extremely precise with line and character positions.
         `;
         
@@ -58,7 +60,8 @@ export const analyzeCodeWithOpenAI = async (code: string) => {
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: `Analyze this code:\n\`\`\`\n${code}\n\`\`\`` }
-            ]
+            ],
+            temperature:0.95
         });
         
         const response = completion.choices[0].message.content;

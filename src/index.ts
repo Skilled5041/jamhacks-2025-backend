@@ -63,6 +63,7 @@ async function handleCodeAnalysis(ws: any, code: string) {
         const errors = await analyzeCode(code);
 
         // Send errors to the client
+        
         ws.send(JSON.stringify({
             type: "codeErrors",
             errors
