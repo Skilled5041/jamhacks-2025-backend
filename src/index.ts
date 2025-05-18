@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia";
-import { streamOpenAIResponse, streamGeminiResponse, getOpenAIResponse } from "./openai";
-import {teacherPrompt, coderPrompt} from "./proompts";
-
+import {getOpenAIResponse, streamGeminiResponse, streamOpenAIResponse} from "./openai";
+import { teacherPrompt, coderPrompt } from "./proompts";
+import { analyzeCode, CodeError } from "./codeanalyzer";
 
 // Create a messages object to maintain conversation history for each connection
 const connectionMessages = new Map();
@@ -26,7 +26,7 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
             codeHelper = true;
         }
         response += data;
-        data = data.replaceAll("\n", "🆕");
+        data = data.replaceAll("\r\n", "🆕");
         if(!codeHelper){
             ws.send(data);
         }
@@ -56,6 +56,34 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
     ws.send("Endstreaming");
 }
 
+// new function for code analysis
+async function handleCodeAnalysis(ws: any, code: string) {
+    try {
+        // Analyze the code for errors
+        const errors = await analyzeCode(code);
+
+        // Send errors to the client
+        ws.send(JSON.stringify({
+            type: "codeErrors",
+            errors
+        }));
+
+        return errors;
+    } catch (error) {
+        console.error("Error analyzing code:", error);
+        ws.send(JSON.stringify({
+            type: "codeErrors",
+            // error line & characters sent to frontend
+            errors: [{
+                line: 1,
+                character: 1,
+                message: "Failed to analyze code",
+                severity: "error"
+            }]
+        }));
+        return [];
+    }
+}
 
 const app = new Elysia()
     .get("/", () => "Hello World")
@@ -114,13 +142,32 @@ body: t.Object({
                 { role: 'system', content: teacherPrompt }
             ];
             
+            // First analyze the code for errors
+            const errors = await handleCodeAnalysis(ws, code);
+
+            // Enhanced debugging with error information
+            const errorInfo = errors.length > 0
+                ? `\n\nI found these specific issues:\n${errors.map(e => 
+                    `Line ${e.line}, Character ${e.character}: ${e.message} (${e.severity})`).join('\n')}`
+                : '\n\nNo syntax errors were detected, but there might be logical issues.';
+
             // Add user message
-            messages.push({ role: 'user', content: `Code: <<<${code}>>>.\n\nQuestion: ${message}` });
+            messages.push({ role: 'user', content: `Code: <<<${code}>>>.\n\nError: ${errorInfo}\n\nQuestion: ${message}` });
             
             handleMessage(ws, messages, code);
         },
         close(ws){
             connectionMessages.delete(ws.id);
+        }
+    })
+
+    // new endpoint for code analysis without chat
+    .ws('/analyze', {
+        body: t.Object({
+            code: t.String()
+        }),
+        async message(ws, {code}) {
+            await handleCodeAnalysis(ws, code);
         }
     })
     .listen(3000);
