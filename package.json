@@ -7,9 +7,11 @@
   },
   "dependencies": {
     "elysia": "latest",
+    "esprima": "^4.0.1",
     "openai": "^4.100.0"
   },
   "devDependencies": {
+    "@types/esprima": "^4.0.6",
     "bun-types": "latest"
   },
   "module": "src/index.js"
