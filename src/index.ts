@@ -34,7 +34,7 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
         const codeRes = await getOpenAIResponse([
             {role: "system", content: coderPrompt},
             {role: "user", content: response}
-        ])
+        ]);
         console.log(codeRes);
         messages.push({role: "assistant", content: `The expert coder has responded with the following: ${codeRes}`});
         response = '';
@@ -63,19 +63,27 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
     ws.send("Endstreaming");
 }
 
-// new function for code analysis
-async function handleCodeAnalysis(ws: any, code: string) {
+// function for code analysis
+async function handleCodeAnalysis(ws: any, code: string): Promise<CodeError[]> {
     try {
-        // Analyze the code for errors
+        // analyze code function to catch errors
         const errors = await analyzeCode(code);
         
-        // Send errors to the client
+        // validating that each error has line and character positions
+        const validatedErrors = errors.filter(error => 
+            typeof error.line === 'number' && 
+            typeof error.character === 'number' &&
+            typeof error.message === 'string' &&
+            (error.severity === 'error' || error.severity === 'warning')
+        );
+        
+        // returning errors to the client
         ws.send(JSON.stringify({
             type: "codeErrors",
-            errors
+            errors: validatedErrors
         }));
         
-        return errors;
+        return validatedErrors;
     } catch (error) {
         console.error("Error analyzing code:", error);
         ws.send(JSON.stringify({
@@ -112,12 +120,12 @@ const app = new Elysia()
                 { role: 'system', content: teacherPrompt }
             ];
             
-            // first analyze the code for errors
+            // first analyze the code for logic errors
             const errors = await handleCodeAnalysis(ws, code);
             
             // adding user message with error information if available
             const errorInfo = errors.length > 0 
-                ? `\n\nI detected the following issues in your code:\n${errors.map(e => 
+                ? `\n\nI detected the following logical issues in your code:\n${errors.map(e => 
                     `Line ${e.line}, Character ${e.character}: ${e.message} (${e.severity})`).join('\n')}`
                 : '';
                 
@@ -148,14 +156,14 @@ const app = new Elysia()
                 { role: 'system', content: teacherPrompt }
             ];
             
-            // First analyze the code for errors
+            // First analyze the code for logic errors
             const errors = await handleCodeAnalysis(ws, code);
             
             // Enhanced debugging with error information
             const errorInfo = errors.length > 0 
-                ? `\n\nI found these specific issues:\n${errors.map(e => 
+                ? `\n\nI found these specific logical issues:\n${errors.map(e => 
                     `Line ${e.line}, Character ${e.character}: ${e.message} (${e.severity})`).join('\n')}`
-                : '\n\nNo syntax errors were detected, but there might be logical issues.';
+                : '\n\nNo logical errors were detected, but there might be edge cases or other issues to consider.';
             
             // Add user message
             messages.push({ role: 'user', content: `This is the user's current code: ${code}.${errorInfo}\n\nThe user was asking: ${message}` });
@@ -167,7 +175,7 @@ const app = new Elysia()
         }
     })
     
-    // new endpoint for code analysis without chat
+    // endpoint for code analysis without chat
     .ws('/analyze', {
         body: t.Object({
             code: t.String()
