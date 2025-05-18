@@ -16,8 +16,7 @@ function toChatCompletionMessages(messages: Array<{ role: string, content: strin
   }));
 }
 
-export const getOpenAIResponse = async (messages: Array<{ role: string, content: string }>, ) => { 
-    const chatMessages = toChatCompletionMessages(messages);
+export const getOpenAIResponse = async (messages: Array<{ role: string, content: string }>) => { 
     try {
         const chatMessages: ChatCompletionMessageParam[] = messages.map(msg => ({
             role: msg.role as 'system' | 'user' | 'assistant',
@@ -39,17 +38,34 @@ export const getOpenAIResponse = async (messages: Array<{ role: string, content:
 export const analyzeCodeWithOpenAI = async (code: string) => {
     try {
         const systemPrompt = `
-            You are a code analysis expert. Analyze the provided JavaScript/TypeScript code for errors.
-            Return ONLY a JSON array with error objects in this format:
-            [
-                // {returning the line & character of error}
-                    "line": number,
-                    "character": number,
-                    "message": "detailed error description",
-                    "severity": "error" or "warning"
-                }
-            ]
-            Empty array if no errors. Be extremely precise with line and character positions.
+            You are a code analysis expert specializing in logical error detection. Analyze the provided JavaScript/TypeScript code for logical errors and potential bugs, not syntax errors.
+            
+            Focus on issues like:
+            - Incorrect logic in conditionals
+            - Potential race conditions
+            - Error handling problems
+            - Memory leaks
+            - Incorrect API usage
+            - Infinite loops or recursion
+            - Edge case bugs
+            - Type mismatches or unsafe type operations
+            - Inefficient algorithms or patterns
+            - Security vulnerabilities
+            
+            Return ONLY a JSON object with this structure:
+            {
+                "errors": [
+                    {
+                        "line": number,
+                        "character": number,
+                        "message": "detailed error description",
+                        "severity": "error" or "warning"
+                    }
+                ]
+            }
+            
+            It is ABSOLUTELY CRITICAL that you include accurate line and character numbers for each error.
+            Return empty array if no logical errors. Be extremely precise with line and character positions.
         `;
         
         const completion = await openaiClient.chat.completions.create({
@@ -57,13 +73,39 @@ export const analyzeCodeWithOpenAI = async (code: string) => {
             response_format: { type: "json_object" },
             messages: [
                 { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Analyze this code:\n\`\`\`\n${code}\n\`\`\`` }
+                { role: 'user', content: `Analyze this code for logical errors:\n\`\`\`\n${code}\n\`\`\`` }
             ]
         });
         
         const response = completion.choices[0].message.content;
         try {
-            return JSON.parse(response ?? '');
+            const parsedResponse = JSON.parse(response ?? '{ "errors": [] }');
+            
+            // ensuring the response has the expected format
+            if (!parsedResponse.errors) {
+                parsedResponse.errors = [];
+            }
+            
+            // validating each error object has required fields
+            interface CodeAnalysisError {
+              line: number;
+              character: number;
+              message: string;
+              severity: 'error' | 'warning';
+            }
+
+            interface CodeAnalysisResponse {
+              errors: CodeAnalysisError[];
+            }
+
+            (parsedResponse as CodeAnalysisResponse).errors = (parsedResponse.errors as CodeAnalysisError[]).filter((error: CodeAnalysisError) => 
+              typeof error.line === 'number' && 
+              typeof error.character === 'number' && 
+              typeof error.message === 'string' && 
+              (error.severity === 'error' || error.severity === 'warning')
+            );
+            
+            return parsedResponse;
         } catch (parseError) {
             console.error('Failed to parse JSON response:', parseError);
             console.log('Raw response:', response);
