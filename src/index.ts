@@ -17,16 +17,16 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
         if(data.includes("🎐")){
             codeHelper = true;
         }
-        data = data.replaceAll("\n", "🆕");
         response += data;
         if(!codeHelper){
+            data = data.replaceAll("\r\n", "🆕");
             ws.send(data);
         }
     });
 
 
     if(codeHelper){
-        console.log("Asking expert coder");
+        console.log(`Asking expert coder: ${response}`);
         ws.send("codeinsertion");
         response = '';
         await streamOpenAIResponse([

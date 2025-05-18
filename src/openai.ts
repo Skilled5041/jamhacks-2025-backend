@@ -40,6 +40,7 @@ export const streamOpenAIResponse = async (messages: Array<{ role: string, conte
             model: 'gpt-4o',
             messages: chatMessages,
             stream: true,
+            temperature: 0.9
         });
         
         for await (const chunk of stream) {
