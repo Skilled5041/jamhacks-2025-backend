@@ -12,8 +12,9 @@ export interface CodeError {
 
 export async function analyzeCode(code: string): Promise<CodeError[]> {
   const errors: CodeError[] = [];
+  console.log(code);
   
-  /*try {
+  try {
     parseModule(code, { loc: true, tolerant: true });
   } catch (error: any) {
     if (error.lineNumber && error.column) {
@@ -25,7 +26,7 @@ export async function analyzeCode(code: string): Promise<CodeError[]> {
         severity: 'error'
       });
     }
-  }*/
+  }
 
   // using LLM to analyze more complex issues
   try {
@@ -36,6 +37,8 @@ export async function analyzeCode(code: string): Promise<CodeError[]> {
   } catch (llmError) {
     console.error('LLM analysis error:', llmError);
   }
+  console.log(errors);
+  
 
   return errors;
 }
