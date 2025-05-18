@@ -87,18 +87,18 @@ async function handleCodeAnalysis(ws: any, code: string) {
 
 const app = new Elysia()
     .get("/", () => "Hello World")
-    .post("/fitb", async ({body}) => {
-        return await askCodeExpert(body.message, body.code);
-    },
-    {
+    .ws("/fitb", {
         body: t.Object({
             code: t.String(),
             message: t.String()
         })
-    }
-)
+    , async message(ws, {code, message}) {
+        console.log("/fitb");
+        console.log(`Code:${code}, Messsage: ${message}`);
+        ws.send(await askCodeExpert(message, code));
+    }})
     .ws('/help',  {        
-body: t.Object({
+        body: t.Object({
             code: t.String(),
             message: t.String()
         }),
