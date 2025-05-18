@@ -1,10 +1,18 @@
 import { Elysia, t } from "elysia";
-import { streamOpenAIResponse, streamGeminiResponse } from "./openai";
+import { streamOpenAIResponse, streamGeminiResponse, getOpenAIResponse } from "./openai";
 import {teacherPrompt, coderPrompt} from "./proompts";
 
 
 // Create a messages object to maintain conversation history for each connection
 const connectionMessages = new Map();
+
+async function askCodeExpert(message: string, code: string){
+    const res = await getOpenAIResponse([
+        {role: "system", content: coderPrompt},
+        {role: "user", content: `Please create a fill-in the blank exercise. Context: ${message}\n\nCode: <<<${code}>>>`}
+    ])
+    return res;
+}
 
 async function handleMessage(ws: any, messages: Array<{ role: string, content: string }>, code:string) {
     console.log(messages.slice(1, messages.length));
@@ -18,8 +26,8 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
             codeHelper = true;
         }
         response += data;
+        data = data.replaceAll("\r\n", "🆕");
         if(!codeHelper){
-            data = data.replaceAll("\r\n", "🆕");
             ws.send(data);
         }
     });
@@ -28,12 +36,12 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
     if(codeHelper){
         console.log(`Asking expert coder: ${response}`);
         ws.send("codeinsertion");
-        response = '';
+        let newRes = '';
         await streamOpenAIResponse([
             {role: "system", content: coderPrompt},
             {role: "user", content: `Message: ${response}\n\nCode: <<<${code}>>>`}
         ],(data) => {
-            response += data;
+            newRes += data;
             ws.send(data);
         });
         
@@ -51,6 +59,16 @@ async function handleMessage(ws: any, messages: Array<{ role: string, content: s
 
 const app = new Elysia()
     .get("/", () => "Hello World")
+    .post("/fitb", async ({body}) => {
+        return await askCodeExpert(body.message, body.code);
+    },
+    {
+        body: t.Object({
+            code: t.String(),
+            message: t.String()
+        })
+    }
+)
     .ws('/help',  {        
 body: t.Object({
             code: t.String(),
