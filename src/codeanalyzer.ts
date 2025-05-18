@@ -1,7 +1,4 @@
-// need to npm install esprima @types/esprima !!!
-
-
-import { parseModule } from 'esprima';
+import { analyzeCodeWithOpenAI } from './openai';
 
 export interface CodeError {
   line: number;
@@ -10,51 +7,29 @@ export interface CodeError {
   severity: 'error' | 'warning';
 }
 
-export async function analyzeCode(code: string): Promise<CodeError[]> {
-  const errors: CodeError[] = [];
-  
-  try {
-    parseModule(code, { loc: true, tolerant: true });
-  } catch (error: any) {
-    if (error.lineNumber && error.column) {
-      errors.push({
-        // detects the line & character of the error
-        line: error.lineNumber,
-        character: error.column,
-        message: error.description || 'Syntax error',
-        severity: 'error'
-      });
-    }
-  }
-
-  // using LLM to analyze more complex issues
-  try {
-    const errorAnalysis = await analyzeLLM(code);
-    if (errorAnalysis && errorAnalysis.length > 0) {
-      errors.push(...errorAnalysis);
-    }
-  } catch (llmError) {
-    console.error('LLM analysis error:', llmError);
-  }
-
-  return errors;
+interface CodeAnalysisResult {
+  errors: Array<Partial<CodeError>>;
 }
 
-async function analyzeLLM(code: string): Promise<CodeError[]> {
-  //  uses the specialized OpenAI function for code analysis
-  const { analyzeCodeWithOpenAI } = await import('./openai');
-  
+export async function analyzeCode(code: string): Promise<CodeError[]> {
+  // focusing mainly on logic errors so we'll just use LLM
   try {
-    const result = await analyzeCodeWithOpenAI(code);
+    const result = await analyzeCodeWithOpenAI(code) as CodeAnalysisResult;
     
-    if (result && Array.isArray(result)) {
-      return result;
-    } else if (result && result.errors && Array.isArray(result.errors)) {
-      return result.errors;
+    // ensuring the result has the expected format - should have errors array
+    if (result && result.errors && Array.isArray(result.errors)) {
+      // validating each error object has required fields
+      return result.errors.filter((error): error is CodeError => 
+        typeof error.line === 'number' && 
+        typeof error.character === 'number' && 
+        typeof error.message === 'string' && 
+        (error.severity === 'error' || error.severity === 'warning')
+      );
     }
     
+    console.warn('Unexpected result format from analyzeCodeWithOpenAI:', result);
     return [];
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed during LLM code analysis:', error);
     return [];
   }
